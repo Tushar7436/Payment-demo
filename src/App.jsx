@@ -2,7 +2,6 @@ import { useEffect } from "react";
 
 export default function App() {
   useEffect(() => {
-    // Read URL params
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get("order_id");
     const amount = params.get("amount");
@@ -15,7 +14,6 @@ export default function App() {
       return;
     }
 
-    // Load Razorpay script dynamically
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => {
@@ -28,8 +26,22 @@ export default function App() {
         order_id: orderId,
         prefill: { contact: phone },
         theme: { color: "#4a90e2" },
-        handler: function (response) {
+
+        handler: async function (response) {
           alert("Payment Successful!");
+
+          await fetch("https://orena-node-bot.onrender.com/api/payment/success", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              order_id: orderId,
+              payment_id: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+              phone: phone,
+              course: course,
+              amount: amount
+            })
+          });
         },
       };
 
