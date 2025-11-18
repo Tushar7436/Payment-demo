@@ -2,23 +2,20 @@ import { useEffect } from "react";
 
 export default function App() {
   useEffect(() => {
-    // URL params sent from WhatsApp Node backend
+    // Read URL params
     const params = new URLSearchParams(window.location.search);
-
     const orderId = params.get("order_id");
     const amount = params.get("amount");
     const key = params.get("key");
     const phone = params.get("phone");
-    const courseId = params.get("course");   // numeric id or slug
-    const courseName = params.get("course_name") || courseId;
+    const course = params.get("course"); // not used now
 
-    // Validate essential params
     if (!orderId || !amount || !key) {
       alert("Invalid Payment Link");
       return;
     }
 
-    // Dynamically load Razorpay library
+    // Load Razorpay checkout script dynamically
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
 
@@ -28,7 +25,7 @@ export default function App() {
         amount,
         currency: "INR",
         name: "Orenna Courses",
-        description: `Payment for ${courseName}`,
+        description: `Payment for ${course}`,
         order_id: orderId,
         prefill: { contact: phone },
 
@@ -37,20 +34,33 @@ export default function App() {
         handler: async function (response) {
           alert("Payment Successful!");
 
-          // Send payment confirmation to backend
-          await fetch("https://orena-node-bot.onrender.com/api/payment/success", {
+          // Send POST to Node backend
+          await fetch("https://orena-node-bot.onrender.com/api/payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              phone: phone,
               order_id: orderId,
               payment_id: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
-              phone: phone,
-              course_id: courseId,
-              course_name: courseName,
               amount: amount
             })
           });
+        },
+
+        modal: {
+          ondismiss: async function () {
+            // If user closes the popup without paying
+            await fetch("https://orena-node-bot.onrender.com/api/payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone: phone,
+                order_id: orderId,
+                payment_id: "PAYMENT_FAILED",
+                amount: amount
+              })
+            });
+          }
         }
       };
 
