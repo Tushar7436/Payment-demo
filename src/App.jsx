@@ -40,7 +40,7 @@ export default function App() {
           // 1) SEND EMAIL TO STUDENT -----------------------------------
           emailjs.send(
             "service_dsw51zc",
-            "template_hi8z4g5",
+            "template_li8f20h",
               {
                   to_email: email,    // 👈 STUDENT EMAIL GOES HERE
                   phone,
