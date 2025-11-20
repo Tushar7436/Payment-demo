@@ -2,6 +2,22 @@ import { useEffect } from "react";
 import emailjs from "@emailjs/browser";
 
 export default function App() {
+
+  // ----------------------------------------------------
+  //  COMMON EMAIL SENDER (reusable)
+  // ----------------------------------------------------
+  const sendEmail = (templateId, payload) => {
+    return emailjs.send(
+      "service_dsw51zc",
+      templateId,
+      payload,
+      "hEtwuhRbrfCNNcjAo"
+    );
+  };
+
+  // ----------------------------------------------------
+  //  PAYMENT WORKFLOW
+  // ----------------------------------------------------
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -37,31 +53,26 @@ export default function App() {
         handler: async function (response) {
           alert("Payment Successful!");
 
-          // 1) SEND EMAIL TO STUDENT -----------------------------------
-          emailjs.send(
-            "service_dsw51zc",
-            "template_li8f20h",
-              {
-                  to_email: email,    // 👈 STUDENT EMAIL GOES HERE
-                  phone,
-                  order_id: orderId,
-                  course,
-                  course_id: courseId,
-                  price,
-                  payment_id: response.razorpay_payment_id
-                },
-            "hEtwuhRbrfCNNcjAo"
-          );
+          // ⭐ PAYMENT EMAIL
+          await sendEmail("template_li8f20h", {
+            to_email: email,
+            phone,
+            order_id: orderId,
+            course,
+            course_id: courseId,
+            price,
+            payment_id: response.razorpay_payment_id
+          });
 
-          // 2) Notify backend -----------------------------------------
+          // Notify backend
           await fetch("https://orena-node-bot.onrender.com/api/payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              phone: phone,
+              phone,
               order_id: orderId,
               payment_id: response.razorpay_payment_id,
-              amount: amount,
+              amount,
               course_id: courseId
             })
           });
@@ -73,10 +84,10 @@ export default function App() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                phone: phone,
+                phone,
                 order_id: orderId,
                 payment_id: "PAYMENT_FAILED",
-                amount: amount,
+                amount,
                 course_id: courseId
               })
             });
@@ -91,46 +102,28 @@ export default function App() {
     document.body.appendChild(script);
   }, []);
 
-return (
+  // ----------------------------------------------------
+  // THIS WILL ALSO LISTEN FOR WELCOME MESSAGE FROM BACKEND
+  // ----------------------------------------------------
+  useEffect(() => {
+    window.addEventListener("message", (event) => {
+      if (!event.data || !event.data.type) return;
+
+      if (event.data.type === "welcome") {
+        // ⭐ WELCOME EMAIL
+        sendEmail("template_welcome_user", {
+          to_email: event.data.email,
+          name: event.data.name,
+          phone: event.data.phone
+        });
+      }
+    });
+  }, []);
+
+
+  return (
     <div style={{ textAlign: "center", marginTop: "50px" }}>
-      {paymentStatus === "loading" && (
-        <h2>Loading secure payment...</h2>
-      )}
-
-      {paymentStatus === "success" && (
-        <div style={{ padding: "40px" }}>
-          <h2 style={{ color: "#4a90e2", marginBottom: "20px" }}>
-            ✅ Payment Successful!
-          </h2>
-          <p style={{ fontSize: "16px", color: "#666", marginBottom: "30px" }}>
-            Thank you for your purchase. This tab is no longer needed. Please close this window.
-          </p>
-          <button
-            onClick={handleWhatsappRedirect}
-            style={{
-              padding: "12px 30px",
-              backgroundColor: "#25D366",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              fontSize: "16px",
-              cursor: "pointer",
-              fontWeight: "bold"
-            }}
-          >
-            Chat on WhatsApp
-          </button>
-        </div>
-      )}
-
-      {paymentStatus === "failed" && (
-        <div style={{ padding: "40px" }}>
-          <h2 style={{ color: "#e74c3c" }}>❌ Payment Cancelled</h2>
-          <p style={{ fontSize: "16px", color: "#666" }}>
-            Your payment was not completed. Please try again.
-          </p>
-        </div>
-      )}
+      <h2>Loading secure payment...</h2>
     </div>
   );
 }
