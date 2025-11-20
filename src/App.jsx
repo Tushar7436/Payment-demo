@@ -91,9 +91,46 @@ export default function App() {
     document.body.appendChild(script);
   }, []);
 
-  return (
-    <div style={{ textAlign: "center", marginTop: "30px" }}>
-      <h2>Loading secure payment...</h2>
+return (
+    <div style={{ textAlign: "center", marginTop: "50px" }}>
+      {paymentStatus === "loading" && (
+        <h2>Loading secure payment...</h2>
+      )}
+
+      {paymentStatus === "success" && (
+        <div style={{ padding: "40px" }}>
+          <h2 style={{ color: "#4a90e2", marginBottom: "20px" }}>
+            ✅ Payment Successful!
+          </h2>
+          <p style={{ fontSize: "16px", color: "#666", marginBottom: "30px" }}>
+            Thank you for your purchase. This tab is no longer needed. Please close this window.
+          </p>
+          <button
+            onClick={handleWhatsappRedirect}
+            style={{
+              padding: "12px 30px",
+              backgroundColor: "#25D366",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              fontSize: "16px",
+              cursor: "pointer",
+              fontWeight: "bold"
+            }}
+          >
+            Chat on WhatsApp
+          </button>
+        </div>
+      )}
+
+      {paymentStatus === "failed" && (
+        <div style={{ padding: "40px" }}>
+          <h2 style={{ color: "#e74c3c" }}>❌ Payment Cancelled</h2>
+          <p style={{ fontSize: "16px", color: "#666" }}>
+            Your payment was not completed. Please try again.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
