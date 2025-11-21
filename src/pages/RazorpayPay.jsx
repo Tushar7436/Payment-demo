@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import emailjs from "@emailjs/browser";
+const backend_url = process.env.REACT_APP_backend_url || ""
 
 export default function Razorpay() {
   // ----------------------------------------------------
@@ -57,7 +58,7 @@ export default function Razorpay() {
           });
 
           // Notify backend
-          await fetch("https://orena-whatsapp-node-bot.onrender.com/api/payment", {
+          await fetch(backend_url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -70,7 +71,7 @@ export default function Razorpay() {
           });
 
           // 🎯 NO POPUP - Redirect to WhatsApp Business or close tab
-          const whatsappNumber = "15556298089"; 
+          const whatsappNumber = "15556319362"; 
           const message = encodeURIComponent(
             `✅ Payment Successful!\n\nCourse: ${course}\nOrder ID: ${orderId}\nAmount: ₹${(amount / 100).toFixed(2)}\nPayment ID: ${response.razorpay_payment_id}`
           );
@@ -86,7 +87,7 @@ export default function Razorpay() {
         },
         modal: {
           ondismiss: async function () {
-            await fetch("https://orena-whatsapp-node-bot.onrender.com/api/payment", {
+            await fetch(backend_url, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
