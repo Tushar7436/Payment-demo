@@ -57,7 +57,7 @@ export default function Razorpay() {
           });
 
           // Notify backend
-          await fetch("https://orena-node-bot.onrender.com/api/payment", {
+          await fetch("https://orena-whatsapp-node-bot.onrender.com/api/payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -86,7 +86,7 @@ export default function Razorpay() {
         },
         modal: {
           ondismiss: async function () {
-            await fetch("https://orena-node-bot.onrender.com/api/payment", {
+            await fetch("https://orena-whatsapp-node-bot.onrender.com/api/payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
