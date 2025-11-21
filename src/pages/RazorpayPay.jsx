@@ -70,7 +70,7 @@ export default function Razorpay() {
           });
 
           // 🎯 NO POPUP - Redirect to WhatsApp Business or close tab
-          const whatsappNumber = "15556319362"; // e.g., "911234567890"
+          const whatsappNumber = "15556298089"; 
           const message = encodeURIComponent(
             `✅ Payment Successful!\n\nCourse: ${course}\nOrder ID: ${orderId}\nAmount: ₹${(amount / 100).toFixed(2)}\nPayment ID: ${response.razorpay_payment_id}`
           );
