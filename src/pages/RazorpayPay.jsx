@@ -45,44 +45,43 @@ export default function Razorpay() {
         prefill: { contact: phone },
         theme: { color: "#4a90e2" },
         handler: async function (response) {
-          // ⭐ PAYMENT EMAIL
-          await sendEmail("template_li8f20h", {
-            to_email: email,
-            phone,
-            order_id: orderId,
-            course,
-            course_id: courseId,
-            price,
-            payment_id: response.razorpay_payment_id
-          });
-
-          // Notify backend
-          await fetch("https://orena-node-bot.onrender.com/api/payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              phone,
-              order_id: orderId,
-              payment_id: response.razorpay_payment_id,
-              amount,
-              course_id: courseId
-            })
-          });
-
-          // 🎯 NO POPUP - Redirect to WhatsApp Business or close tab
+          // 🎯 INSTANT redirect to WhatsApp - do email/backend calls in background
           const whatsappNumber = "15556319362"; // e.g., "911234567890"
           const message = encodeURIComponent(
             `✅ Payment Successful!\n\nCourse: ${course}\nOrder ID: ${orderId}\nAmount: ₹${(amount / 100).toFixed(2)}\nPayment ID: ${response.razorpay_payment_id}`
           );
           const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
           
-          // Redirect to WhatsApp
+          // Redirect IMMEDIATELY
           window.location.href = whatsappUrl;
           
-          // If opened in a popup/new tab, close after 2 seconds
-          setTimeout(() => {
-            window.close();
-          }, 2000);
+          // Send email & notify backend in background (non-blocking)
+          Promise.all([
+            sendEmail("template_li8f20h", {
+              to_email: email,
+              phone,
+              order_id: orderId,
+              course,
+              course_id: courseId,
+              price,
+              payment_id: response.razorpay_payment_id
+            }).catch(err => console.error("Email error:", err)),
+            
+            fetch("https://orena-node-bot.onrender.com/api/payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone,
+                order_id: orderId,
+                payment_id: response.razorpay_payment_id,
+                amount,
+                course_id: courseId
+              })
+            }).catch(err => console.error("Backend error:", err))
+          ]);
+          
+          // Close tab after redirect
+          setTimeout(() => window.close(), 500);
         },
         modal: {
           ondismiss: async function () {
