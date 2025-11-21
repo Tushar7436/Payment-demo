@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import emailjs from "@emailjs/browser";
 
 export default function Razorpay() {
-  const [loading, setLoading] = useState(true);
+  const [razorpayOpened, setRazorpayOpened] = useState(false);
 
   const sendEmail = (templateId, payload) => {
     return emailjs.send(
@@ -15,19 +15,17 @@ export default function Razorpay() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-
-    // Instead of exposing all data, backend will send a token
     const token = params.get("t");
 
+    // If no token, close page
     if (!token) {
       window.close();
       return;
     }
 
-    // Decode token
     let data;
     try {
-      data = JSON.parse(atob(token)); // BASE64 decode
+      data = JSON.parse(atob(token)); // Decode
     } catch (e) {
       window.close();
       return;
@@ -35,6 +33,7 @@ export default function Razorpay() {
 
     const { orderId, amount, key, phone, course, courseId, price, email } = data;
 
+    // Load Razorpay JS
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
 
@@ -49,9 +48,9 @@ export default function Razorpay() {
         prefill: { contact: phone },
         theme: { color: "#4a90e2" },
 
-        // SUCCESS HANDLER
         handler: async function (response) {
-          // Send confirmation email
+          // SUCCESS BLOCK
+
           await sendEmail("template_li8f20h", {
             to_email: email,
             phone,
@@ -62,7 +61,6 @@ export default function Razorpay() {
             payment_id: response.razorpay_payment_id
           });
 
-          // Notify backend
           await fetch("https://orena-node-bot.onrender.com/api/payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -75,13 +73,15 @@ export default function Razorpay() {
             })
           });
 
-          // Auto-close tab after 2 sec
-          setTimeout(() => window.close(), 2000);
+          // CLOSE TAB AFTER SUCCESS
+          setTimeout(() => window.close(), 1000);
         },
 
         modal: {
           ondismiss: async function () {
-            // Notify payment failure
+            if (!razorpayOpened) return; // prevent premature close on load
+
+            // FAILED PAYMENT
             await fetch("https://orena-node-bot.onrender.com/api/payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -94,15 +94,21 @@ export default function Razorpay() {
               })
             });
 
-            // Close tab
+            // Close tab after user closes the modal
             setTimeout(() => window.close(), 1000);
           }
         }
       };
 
       const razorpay = new window.Razorpay(options);
-      razorpay.open();
-      setLoading(false);
+
+      // OPEN Razorpay UI SAFELY
+      try {
+        razorpay.open();
+        setRazorpayOpened(true);
+      } catch (err) {
+        console.error("Razorpay failed:", err);
+      }
     };
 
     document.body.appendChild(script);
@@ -110,7 +116,7 @@ export default function Razorpay() {
 
   return (
     <div className="text-center bg-black text-white flex items-center justify-center h-screen">
-      <h2 className="text-xl">Redirecting to Payment...</h2>
+      <h2 className="text-xl animate-pulse">Redirecting to Payment...</h2>
     </div>
   );
 }
