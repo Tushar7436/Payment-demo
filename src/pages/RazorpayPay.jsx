@@ -111,7 +111,7 @@ export default function Razorpay() {
 
   return (
     <div className="text-center bg-black text-white pt-50 h-screen">
-      <h2>Redirecting to Whatsapp... pls pe paitent on the screen</h2>
+      <h2>Redirecting to Whatsapp... pls be paitent on the screen</h2>
     </div>
   );
 }
