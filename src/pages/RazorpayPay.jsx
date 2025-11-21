@@ -15,16 +15,6 @@ export default function Razorpay() {
   };
 
   useEffect(() => {
-    // Prevent direct access - check if referrer is from your domain
-    const referrer = document.referrer;
-    const isDirectAccess = !referrer || referrer === "";
-    
-    if (isDirectAccess) {
-      // Redirect to homepage or show error
-      window.location.href = "https://your-main-site.com";
-      return;
-    }
-
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get("order_id");
     const amount = params.get("amount");
@@ -35,9 +25,10 @@ export default function Razorpay() {
     const price = params.get("price");
     const email = params.get("email");
 
-    if (!orderId || !amount || !key) {
-      alert("Invalid Payment Link");
-      window.close();
+    // Basic validation - if parameters are missing, it's invalid
+    if (!orderId || !amount || !key || !phone || !courseId) {
+      alert("Invalid Payment Link - Missing required parameters");
+      setTimeout(() => window.close(), 2000);
       return;
     }
 
@@ -78,10 +69,10 @@ export default function Razorpay() {
             })
           });
 
-          // 🎯 NO POPUP - Redirect to WhatsApp or close tab
-          const whatsappNumber = "15556319362"; // Replace with your WhatsApp number
+          // 🎯 NO POPUP - Redirect to WhatsApp Business or close tab
+          const whatsappNumber = "15556319362"; // e.g., "911234567890"
           const message = encodeURIComponent(
-            `Hi! I've successfully completed payment for ${course}. Order ID: ${orderId}`
+            `✅ Payment Successful!\n\nCourse: ${course}\nOrder ID: ${orderId}\nAmount: ₹${(amount / 100).toFixed(2)}\nPayment ID: ${response.razorpay_payment_id}`
           );
           const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
           
@@ -91,7 +82,7 @@ export default function Razorpay() {
           // If opened in a popup/new tab, close after 2 seconds
           setTimeout(() => {
             window.close();
-          }, 5000);
+          }, 2000);
         },
         modal: {
           ondismiss: async function () {
