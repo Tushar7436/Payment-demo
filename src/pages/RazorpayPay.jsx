@@ -1,10 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import emailjs from "@emailjs/browser";
 
 export default function Razorpay() {
-  // ----------------------------------------------------
-  //  COMMON EMAIL SENDER (reusable)
-  // ----------------------------------------------------
+  const [loading, setLoading] = useState(true);
+
   const sendEmail = (templateId, payload) => {
     return emailjs.send(
       "service_dsw51zc",
@@ -17,19 +16,24 @@ export default function Razorpay() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
-    const orderId = params.get("order_id");
-    const amount = params.get("amount");
-    const key = params.get("key");
-    const phone = params.get("phone");
-    const course = params.get("course");
-    const courseId = params.get("course_id");
-    const price = params.get("price");
-    const email = params.get("email");
+    // Instead of exposing all data, backend will send a token
+    const token = params.get("t");
 
-    if (!orderId || !amount || !key) {
-      alert("Invalid Payment Link");
+    if (!token) {
+      window.close();
       return;
     }
+
+    // Decode token
+    let data;
+    try {
+      data = JSON.parse(atob(token)); // BASE64 decode
+    } catch (e) {
+      window.close();
+      return;
+    }
+
+    const { orderId, amount, key, phone, course, courseId, price, email } = data;
 
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -39,17 +43,15 @@ export default function Razorpay() {
         key,
         amount,
         currency: "INR",
-        name: "Orenna Courses",
+        name: "Orena Courses",
         description: `Payment for ${course}`,
         order_id: orderId,
         prefill: { contact: phone },
-
         theme: { color: "#4a90e2" },
 
+        // SUCCESS HANDLER
         handler: async function (response) {
-          alert("Payment Successful!");
-
-          // ⭐ PAYMENT EMAIL
+          // Send confirmation email
           await sendEmail("template_li8f20h", {
             to_email: email,
             phone,
@@ -72,10 +74,14 @@ export default function Razorpay() {
               course_id: courseId
             })
           });
+
+          // Auto-close tab after 2 sec
+          setTimeout(() => window.close(), 2000);
         },
 
         modal: {
           ondismiss: async function () {
+            // Notify payment failure
             await fetch("https://orena-node-bot.onrender.com/api/payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -87,20 +93,24 @@ export default function Razorpay() {
                 course_id: courseId
               })
             });
+
+            // Close tab
+            setTimeout(() => window.close(), 1000);
           }
         }
       };
 
       const razorpay = new window.Razorpay(options);
       razorpay.open();
+      setLoading(false);
     };
 
     document.body.appendChild(script);
   }, []);
 
   return (
-    <div className="text-center bg-black text-white pt-50 h-screen">
-      <h2>Redirecting to Payment...</h2>
+    <div className="text-center bg-black text-white flex items-center justify-center h-screen">
+      <h2 className="text-xl">Redirecting to Payment...</h2>
     </div>
   );
 }
