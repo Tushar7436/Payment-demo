@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import emailjs from "@emailjs/browser";
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const backend_url = import.meta.env.VITE_BACKEND_URL;
 
 export default function Razorpay() {
   const [status, setStatus] = useState("processing");
