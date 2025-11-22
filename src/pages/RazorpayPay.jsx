@@ -4,6 +4,7 @@ const backend_url = process.env.REACT_APP_backend_url || ""
 
 export default function Razorpay() {
   const [status, setStatus] = useState("processing");
+  const [debugInfo, setDebugInfo] = useState("");
   
   // ----------------------------------------------------
   //  COMMON EMAIL SENDER (reusable)
@@ -18,6 +19,10 @@ export default function Razorpay() {
   };
 
   useEffect(() => {
+    // Debug: Show backend URL
+    console.log("🔗 Backend URL:", backend_url);
+    setDebugInfo(`Backend: ${backend_url || 'NOT SET'}`);
+    
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get("order_id");
     const amount = params.get("amount");
@@ -49,106 +54,147 @@ export default function Razorpay() {
         theme: { color: "#4a90e2" },
         handler: async function (response) {
           try {
-            console.log("Payment successful, processing...");
+            console.log("✅ Payment successful:", response.razorpay_payment_id);
             setStatus("success");
             
-            // ⭐ WAIT for both email and backend API to complete
-            const results = await Promise.allSettled([
-              // Send email
-              sendEmail("template_li8f20h", {
-                to_email: email,
-                phone,
-                order_id: orderId,
-                course,
-                course_id: courseId,
-                price,
-                payment_id: response.razorpay_payment_id
-              }).then(() => console.log("✅ Email sent successfully"))
-                .catch(err => {
-                  console.error("❌ Email error:", err);
-                  throw err;
-                }),
-              
-              // Notify backend (this will trigger WhatsApp Business message)
-              fetch(backend_url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  phone,
-                  order_id: orderId,
-                  payment_id: response.razorpay_payment_id,
-                  amount,
-                  course_id: courseId
-                })
+            const paymentData = {
+              phone,
+              order_id: orderId,
+              payment_id: response.razorpay_payment_id,
+              amount,
+              course_id: courseId
+            };
+            
+            console.log("📤 Sending to backend:", paymentData);
+            console.log("🔗 Backend URL:", backend_url);
+            
+            // Send email first (this usually works)
+            const emailPromise = sendEmail("template_li8f20h", {
+              to_email: email,
+              phone,
+              order_id: orderId,
+              course,
+              course_id: courseId,
+              price,
+              payment_id: response.razorpay_payment_id
+            })
+              .then(() => {
+                console.log("✅ Email sent successfully");
+                return { success: true, type: 'email' };
               })
-                .then(async res => {
-                  if (!res.ok) {
-                    throw new Error(`Backend returned ${res.status}`);
-                  }
-                  const data = await res.json();
-                  console.log("✅ Backend response:", data);
-                  return data;
-                })
-                .catch(err => {
-                  console.error("❌ Backend error:", err);
-                  throw err;
-                })
-            ]);
+              .catch(err => {
+                console.error("❌ Email error:", err);
+                return { success: false, type: 'email', error: err.message };
+              });
+            
+            // Send to backend with detailed error logging
+            const backendPromise = fetch(backend_url, {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              },
+              body: JSON.stringify(paymentData),
+              // Add timeout handling
+              signal: AbortSignal.timeout(15000) // 15 second timeout
+            })
+              .then(async res => {
+                console.log("📥 Backend response status:", res.status);
+                
+                if (!res.ok) {
+                  const errorText = await res.text();
+                  console.error("❌ Backend error response:", errorText);
+                  throw new Error(`Backend returned ${res.status}: ${errorText}`);
+                }
+                
+                const data = await res.json();
+                console.log("✅ Backend response data:", data);
+                return { success: true, type: 'backend', data };
+              })
+              .catch(err => {
+                console.error("❌ Backend fetch error:", err);
+                console.error("Error type:", err.name);
+                console.error("Error message:", err.message);
+                
+                // More specific error messages
+                let errorMsg = err.message;
+                if (err.name === 'AbortError') {
+                  errorMsg = "Request timeout - backend took too long to respond";
+                } else if (err.message.includes('Failed to fetch')) {
+                  errorMsg = "Network error - cannot reach backend (CORS or URL issue)";
+                }
+                
+                return { success: false, type: 'backend', error: errorMsg };
+              });
 
-            // Check if backend call succeeded
-            const backendResult = results[1];
-            const emailResult = results[0];
+            // Wait for both
+            const [emailResult, backendResult] = await Promise.all([emailPromise, backendPromise]);
 
-            console.log("Email result:", emailResult.status);
-            console.log("Backend result:", backendResult.status);
+            console.log("📊 Results:", { emailResult, backendResult });
 
-            if (backendResult.status === 'fulfilled') {
+            if (backendResult.success) {
               console.log("✅ All operations completed successfully");
-              console.log("📱 WhatsApp message should be sent by backend");
+              setStatus("completed");
+              setDebugInfo("✅ Backend notified successfully");
             } else {
-              console.error("⚠️ Backend call failed:", backendResult.reason);
+              console.error("⚠️ Backend call failed:", backendResult.error);
+              setStatus("partial");
+              setDebugInfo(`⚠️ Backend error: ${backendResult.error}`);
+              
+              // Still show success to user but log the issue
+              alert(
+                `Payment successful! ✅\n\n` +
+                `Order ID: ${orderId}\n` +
+                `Payment ID: ${response.razorpay_payment_id}\n\n` +
+                `Note: There was a connection issue. Please contact support with your Order ID if you don't receive confirmation.`
+              );
             }
 
-            // 🎯 Show success message and let backend handle WhatsApp
-            setStatus("completed");
-            
-            // Close window after showing success (or redirect to success page)
+            // Close window after delay
             setTimeout(() => {
-              // Option 1: Close the window
               window.close();
-              
-              // Option 2: Redirect to success/home page if close doesn't work
-              // window.location.href = "/success?order_id=" + orderId;
-            }, 3000);
+            }, 5000);
             
           } catch (error) {
-            console.error("Error in payment handler:", error);
+            console.error("💥 Unexpected error in payment handler:", error);
             setStatus("error");
+            setDebugInfo(`Error: ${error.message}`);
             alert("Payment successful but there was an issue. Please contact support with Order ID: " + orderId);
           }
         },
         modal: {
           ondismiss: async function () {
             try {
-              console.log("Payment dismissed, notifying backend...");
+              console.log("❌ Payment dismissed/cancelled");
               setStatus("cancelled");
               
-              // Wait for backend call to complete
+              // Try to notify backend of cancellation
+              const cancelData = {
+                phone,
+                order_id: orderId,
+                payment_id: "PAYMENT_FAILED",
+                amount,
+                course_id: courseId
+              };
+              
+              console.log("📤 Notifying backend of cancellation:", cancelData);
+              
               await fetch(backend_url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  phone,
-                  order_id: orderId,
-                  payment_id: "PAYMENT_FAILED",
-                  amount,
-                  course_id: courseId
+                body: JSON.stringify(cancelData),
+                signal: AbortSignal.timeout(10000)
+              })
+                .then(res => {
+                  console.log("✅ Backend notified of cancellation");
+                  return res.json();
                 })
-              });
+                .catch(err => {
+                  console.error("⚠️ Could not notify backend of cancellation:", err);
+                });
               
-              console.log("Backend notified of cancellation");
             } catch (error) {
-              console.error("Error notifying backend:", error);
+              console.error("Error in ondismiss:", error);
             }
             
             setTimeout(() => window.close(), 2000);
@@ -163,7 +209,7 @@ export default function Razorpay() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-black text-white">
-      <div className="text-center">
+      <div className="text-center max-w-md mx-auto px-4">
         {status === "processing" && (
           <>
             <div className="mb-4">
@@ -194,6 +240,15 @@ export default function Razorpay() {
           </>
         )}
         
+        {status === "partial" && (
+          <>
+            <div className="mb-4 text-6xl">⚠️</div>
+            <h2 className="text-xl text-yellow-500">Payment Successful!</h2>
+            <p className="text-gray-300 mt-2">Your payment was processed successfully</p>
+            <p className="text-gray-400 text-sm mt-4">If you don't receive confirmation, please contact support</p>
+          </>
+        )}
+        
         {status === "cancelled" && (
           <>
             <div className="mb-4 text-6xl">❌</div>
@@ -208,6 +263,11 @@ export default function Razorpay() {
             <h2 className="text-xl text-yellow-500">Payment Processed</h2>
             <p className="text-gray-300 mt-2">Please contact support if you don't receive confirmation</p>
           </>
+        )}
+        
+        {/* Debug info - remove in production */}
+        {debugInfo && (
+          <p className="text-xs text-gray-600 mt-4 break-all">{debugInfo}</p>
         )}
       </div>
     </div>
